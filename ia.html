@@ -1,75 +1,218 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Resumidor de estudos com IA</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #fff7f0; }
-    main { max-width: 640px; margin: 0 auto; padding: 24px; }
-    textarea { width: 100%; box-sizing: border-box; padding: 12px; font-size: 16px; }
-    button { margin-top: 12px; padding: 12px 20px; font-size: 16px; border: 0;
-             border-radius: 8px; background: #ee6a33; color: white; }
-    button:disabled { background: #bbb; }
-    .etiqueta { display: inline-block; background: #fce3d3; border-radius: 12px;
-                padding: 4px 10px; margin: 4px 4px 0 0; }
-    .aviso { font-size: 13px; color: #777; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Resumidor de estudos</h1>
-    <p>Cole um texto e a IA devolve um resumo e as palavras-chave.</p>
-    <textarea id="texto" rows="8" maxlength="2000"
-              placeholder="Cole aqui um texto de até 2.000 caracteres"></textarea>
-    <button id="botao">Resumir com IA</button>
-    <div id="resultado"></div>
-    <p class="aviso">Respostas geradas por inteligência artificial podem conter erros.
-      Não envie dados pessoais.</p>
-  </main>
-  <script>
-    const botao = document.getElementById('botao');
-    const resultado = document.getElementById('resultado');
-
-    function mostrar(dados) {
-      resultado.replaceChildren();                // limpa o resultado anterior
-      const resumo = document.createElement('p');
-      resumo.textContent = dados.resumo;          // mostra como texto, com segurança
-      resultado.appendChild(resumo);
-      for (const palavra of dados.palavras_chave || []) {
-        const etiqueta = document.createElement('span');
-        etiqueta.className = 'etiqueta';
-        etiqueta.textContent = palavra;
-        resultado.appendChild(etiqueta);
-      }
-    }
-
-    botao.addEventListener('click', async () => {
-      const texto = document.getElementById('texto').value.trim();
-      if (!texto) {
-        resultado.textContent = 'Digite ou cole um texto primeiro.';
-        return;
-      }
-      botao.disabled = true;                      // evita cliques repetidos
-      resultado.textContent = 'Pensando...';
-      try {
-        const resposta = await fetch('/api/ia', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texto: texto }),
-        });
-        const dados = await resposta.json();
-        if (resposta.ok) {
-          mostrar(dados);
-        } else {
-          resultado.textContent = dados.erro;
-        }
-      } catch (erro) {
-        resultado.textContent = 'Sem conexão com o servidor. Tente de novo.';
-      } finally {
-        botao.disabled = false;
-      }
+&lt;!DOCTYPE html&gt;
+&lt;html lang="pt-BR"&gt;
+&lt;head&gt;
+&lt;meta charset="UTF-8"&gt;
+&lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+&lt;title&gt;Central de Agentes IA&lt;/title&gt;
+&lt;style&gt;
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0f0f1a;color:#e0e0e0;min-height:100vh}
+.app{display:flex;height:100vh;overflow:hidden}
+.selector{width:280px;background:#1a1a2e;padding:16px;overflow-y:auto;border-right:1px solid #333;display:flex;flex-direction:column;gap:8px}
+.selector h2{font-size:16px;margin-bottom:8px;color:#ff6b35;text-align:center}
+.agent-card{padding:12px;border-radius:10px;cursor:pointer;transition:all .2s;border:2px solid transparent;background:#16213e}
+.agent-card:hover{background:#1f3050}
+.agent-card.active{border-color:#ff6b35;background:#1f3050}
+.agent-card .emoji{font-size:24px;display:block;margin-bottom:4px}
+.agent-card .name{font-weight:600;font-size:14px;color:#fff}
+.agent-card .desc{font-size:12px;color:#aaa;margin-top:4px}
+.chat-area{flex:1;display:flex;flex-direction:column;min-width:0}
+.chat-header{padding:12px 16px;background:#1a1a2e;border-bottom:1px solid #333;display:flex;align-items:center;gap:12px;justify-content:space-between;flex-shrink:0}
+.chat-header .agent-name{font-weight:700;font-size:16px;color:#ff6b35}
+.chat-header button{padding:6px 14px;border:1px solid #444;border-radius:6px;background:#16213e;color:#e0e0e0;cursor:pointer;font-size:13px}
+.chat-header button:hover{background:#1f3050}
+.messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.bubble{max-width:80%;padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.5;word-wrap:break-word}
+.bubble.user{align-self:flex-end;background:#ff6b35;color:#fff;border-bottom-right-radius:4px}
+.bubble.assistant{align-self:flex-start;background:#16213e;color:#e0e0e0;border:1px solid #333;border-bottom-left-radius:4px}
+.bubble.system{align-self:center;background:#333;color:#ccc;font-size:12px;border-radius:8px}
+.bubble.error{align-self:center;background:#c0392b;color:#fff;font-size:13px;border-radius:8px}
+.input-area{padding:12px 16px;background:#1a1a2e;border-top:1px solid #333;display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
+.input-area textarea{flex:1;padding:10px;border:1px solid #444;border-radius:8px;background:#16213e;color:#e0e0e0;font-size:14px;resize:none;font-family:inherit;min-height:44px;max-height:120px}
+.input-area textarea:focus{outline:none;border-color:#ff6b35}
+.input-area button{padding:10px 18px;border:none;border-radius:8px;background:#ff6b35;color:#fff;font-size:14px;cursor:pointer;flex-shrink:0}
+.input-area button:hover{background:#e55a28}
+.input-area button:disabled{background:#555;cursor:not-allowed}
+.privacy{padding:12px 16px;background:#111;color:#777;font-size:11px;text-align:center;border-top:1px solid #222;flex-shrink:0}
+.placeholder-msg{text-align:center;color:#555;padding:40px 20px;font-size:14px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #ccc;border-top-color:#ff6b35;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:768px){.app{flex-direction:column}.selector{width:100%;height:auto;max-height:160px;flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:8px;border-right:none;border-bottom:1px solid #333;white-space:nowrap}.selector h2{display:none}.agent-card{flex-shrink:0;min-width:140px}.chat-area{flex:1}}
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div class="app"&gt;
+  &lt;nav class="selector" aria-label="Seleção de agentes IA"&gt;
+    &lt;h2>Agentes IA&lt;/h2&gt;
+    &lt;div class="agent-card active" data-id="resumidor" role="button" tabindex="0" aria-label="Resumidor de estudos"&gt;
+      &lt;span class="emoji"&gt;📝&lt;/span&gt;
+      &lt;span class="name"&gt;Resumidor de estudos&lt;/span&gt;
+      &lt;span class="desc"&gt;Resumos e palavras-chave&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class="agent-card" data-id="tutor" role="button" tabindex="0" aria-label="Tutor de tecnologia"&gt;
+      &lt;span class="emoji"&gt;🎓&lt;/span&gt;
+      &lt;span class="name"&gt;Tutor de tecnologia&lt;/span&gt;
+      &lt;span class="desc"&gt;Ensina conceitos técnicos&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class="agent-card" data-id="analise" role="button" tabindex="0" aria-label="Analisador de texto"&gt;
+      &lt;span class="emoji"&gt;🔍&lt;/span&gt;
+      &lt;span class="name"&gt;Analisador de texto&lt;/span&gt;
+      &lt;span class="desc"&gt;Análise e insights de texto&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class="agent-card" data-id="ferramentas" role="button" tabindex="0" aria-label="Agente com ferramentas"&gt;
+      &lt;span class="emoji"&gt;🛠️&lt;/span&gt;
+      &lt;span class="name"&gt;Agente com ferramentas&lt;/span&gt;
+      &lt;span class="desc"&gt;Médias, datas e cálculos&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class="agent-card" data-id="conecta" role="button" tabindex="0" aria-label="Consulta Conecta Jovem"&gt;
+      &lt;span class="emoji"&gt;🤝&lt;/span&gt;
+      &lt;span class="name"&gt;Consulta Conecta Jovem&lt;/span&gt;
+      &lt;span class="desc"&gt;Informações do programa&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;div class="agent-card" data-id="playground" role="button" tabindex="0" aria-label="Laboratório de IA"&gt;
+      &lt;span class="emoji"&gt;🧪&lt;/span&gt;
+      &lt;span class="name"&gt;Laboratório de IA&lt;/span&gt;
+      &lt;span class="desc"&gt;Prompt custom e temperatura&lt;/span&gt;
+    &lt;/div&gt;
+  &lt;/nav&gt;
+  &lt;main class="chat-area" aria-label="Área de conversa"&gt;
+    &lt;div class="chat-header"&gt;
+      &lt;span class="agent-name"&gt;📝 Resumidor de estudos&lt;/span&gt;
+      &lt;div&gt;&lt;button id="newConvBtn" aria-label="Nova conversa"&gt;+ Nova conversa&lt;/button&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div id="messagesContainer" class="messages" aria-label="Mensagens da conversa" role="log" aria-live="polite"&gt;
+      &lt;div class="placeholder-msg"&gt;Selecione um agente para começar uma conversa.&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class="input-area"&gt;
+      &lt;textarea id="userInput" rows="1" placeholder="Digite sua mensagem..." aria-label="Campo de mensagem" maxlength="2000"&gt;&lt;/textarea&gt;
+      &lt;button id="sendBtn" aria-label="Enviar mensagem"&gt;Enviar&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;div class="privacy"&gt;⚠️ Respostas geradas por IA podem conter erros. Não envie dados pessoais.&lt;/div&gt;
+  &lt;/main&gt;
+&lt;/div&gt;
+&lt;script&gt;
+(function(){
+  var agents=[
+    {id:"resumidor",name:"Resumidor de estudos",emoji:"📝",system:"Você é um Resumidor de estudos. Retorne sempre em português brasileiro. Forneça resumos concisos e palavras-chave do texto enviado."},
+    {id:"tutor",name:"Tutor de tecnologia",emoji:"🎓",system:"Você é um Tutor de tecnologia. Ensine conceitos de programação e tecnologia de forma clara e didática, sempre em português brasileiro."},
+    {id:"analise",name:"Analisador de texto",emoji:"🔍",system:"Você é um Analisador de texto. Forneça análise detalhada, insights e sugestões de melhoria para textos, sempre em português brasileiro."},
+    {id:"ferramentas",name:"Agente com ferramentas",emoji:"🛠️",system:"Você é um Agente com ferramentas. Calcule médias, manipule datas e execute cálculos quando solicitado. Sempre em português brasileiro."},
+    {id:"conecta",name:"Consulta Conecta Jovem",emoji:"🤝",system:"Você é um assistente de consulta do programa Conecta Jovem. Forneça informações ilustrativas sobre o programa, oportunidades e processos. Sempre em português brasileiro."},
+    {id:"playground",name:"Laboratório de IA",emoji:"🧪",system:"Você é um assistente de laboratório de IA. Responda de forma criativa e aberta. Sempre em português brasileiro."}
+  ];
+  var activeId="resumidor";
+  var histories={};
+  agents.forEach(function(a){histories[a.id]=[];});
+  var STORAGE_KEY="agentes_ia_histories";
+  function saveHistories(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(histories));}catch(e){}}
+  function loadHistories(){try{var d=localStorage.getItem(STORAGE_KEY);if(d)histories=JSON.parse(d);}catch(e){}}
+  loadHistories();
+  var container=document.getElementById("messagesContainer");
+  var input=document.getElementById("userInput");
+  var sendBtn=document.getElementById("sendBtn");
+  var newConvBtn=document.getElementById("newConvBtn");
+  var agentNameEl=document.querySelector(".agent-name");
+  var cards=document.querySelectorAll(".agent-card");
+  function updateAgentDisplay(){
+    var a=agents.find(function(x){return x.id===activeId;});
+    agentNameEl.textContent=a.emoji+" "+a.name;
+    cards.forEach(function(c){
+      c.classList.toggle("active",c.dataset.id===activeId);
+      c.setAttribute("aria-selected",c.dataset.id===activeId?"true":"false");
     });
-  </script>
-</body>
-</html>
+    renderMessages();
+  }
+  cards.forEach(function(card){
+    card.addEventListener("click",function(){
+      activeId=card.dataset.id;
+      updateAgentDisplay();
+    });
+    card.addEventListener("keydown",function(e){
+      if(e.key==="Enter"||e.key===" "){e.preventDefault();activeId=card.dataset.id;updateAgentDisplay();}
+    });
+  });
+  function renderMessages(){
+    container.innerHTML="";
+    var msgs=histories[activeId]||[];
+    if(msgs.length===0){
+      var ph=document.createElement("div");
+      ph.className="placeholder-msg";
+      ph.textContent="Selecione um agente para começar uma conversa.";
+      container.appendChild(ph);
+      return;
+    }
+    msgs.forEach(function(msg){
+      var b=document.createElement("div");
+      b.className="bubble "+msg.role;
+      var t=document.createElement("span");
+      t.textContent=msg.content;
+      b.appendChild(t);
+      container.appendChild(b);
+    });
+    container.scrollTop=container.scrollHeight;
+  }
+  function addMessage(role,content){
+    if(!histories[activeId])histories[activeId]=[];
+    histories[activeId].push({role:role,content:content});
+    saveHistories();
+    renderMessages();
+  }
+  function getSendableHistory(){
+    var all=(histories[activeId]||[]).map(function(m){return{role:m.role,content:m.content};});
+    return all.slice(-12);
+  }
+  sendBtn.addEventListener("click",sendMessage);
+  input.addEventListener("keydown",function(e){
+    if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();}
+  });
+  function autoResize(){input.style.height="auto";input.style.height=input.scrollHeight+"px";}
+  input.addEventListener("input",autoResize);
+  newConvBtn.addEventListener("click",function(){
+    histories[activeId]=[];
+    saveHistories();
+    renderMessages();
+  });
+  async function sendMessage(){
+    var text=input.value.trim();
+    if(!text)return;
+    input.value="";
+    autoResize();
+    addMessage("user",text);
+    sendBtn.disabled=true;
+    sendBtn.textContent="Enviando...";
+    var loadBubble=document.createElement("div");
+    loadBubble.className="bubble system";
+    loadBubble.innerHTML="&lt;span class='spinner'&gt;&lt;/span&gt; Processando...";
+    container.appendChild(loadBubble);
+    container.scrollTop=container.scrollHeight;
+    try{
+      var hist=getSendableHistory();
+      var cfg={};
+      if(activeId==="playground"){
+        cfg.prompt=agents.find(function(a){return a.id==="playground";}).system;
+        cfg.temperature=0.7;
+      }else{
+        cfg.prompt=agents.find(function(a){return a.id===activeId;}).system;
+        cfg.temperature=0.7;
+      }
+      var res=await fetch("/api/agentes",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({agente:activeId,mensagem:text,historico:hist,configuracao:cfg})});
+      var data=await res.json();
+      container.removeChild(loadBubble);
+      if(data.erro){
+        addMessage("system","Erro: "+data.erro);
+      }else{
+        addMessage("assistant",data.resposta||"Resposta vazia.");
+      }
+    }catch(err){
+      container.removeChild(loadBubble);
+      addMessage("error","Erro de conexão. Verifique sua rede e tente novamente.");
+      console.error(err);
+    }
+    sendBtn.disabled=false;
+    sendBtn.textContent="Enviar";
+  }
+  updateAgentDisplay();
+})();
+&lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
