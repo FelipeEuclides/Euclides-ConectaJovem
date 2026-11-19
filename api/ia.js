@@ -31,7 +31,7 @@ export default {
     const resposta = await fetch(URL_IA, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.AI_GATEWAY_API_KEY}`,
+        Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
